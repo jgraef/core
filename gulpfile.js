@@ -165,6 +165,7 @@ const sources = {
         './src/main/generic/network/connection/NetworkConnection.js',
         './src/main/generic/network/connection/PeerChannel.js',
         './src/main/generic/network/connection/NetworkAgent.js',
+        './src/main/generic/network/connection/PeerConnectionStatistics.js',
         './src/main/generic/network/connection/PeerConnection.js',
         './src/main/generic/network/connection/SignalProcessor.js',
         './src/main/generic/network/connection/ConnectionPool.js',
