@@ -38,25 +38,11 @@ class ConnectionPool extends Observable {
         this._time = time;
 
         /**
-         * Map of all PeerConnections active.
-         * @type {Map.<number, PeerConnection>}
-         * @private
-         */
-        this._store = new Map();
-
-        /**
          * HashMap of all inbound PeerConnections that are not yet assigned to an address.
          * @type {HashMap.<NetworkConnection, PeerConnection>}
          * @private
          */
         this._inboundStore = new HashMap();
-
-        /**
-         * HashMap from peerIds to RTC connections.
-         * @type {HashMap.<PeerId, PeerConnection>}
-         * @private
-         */
-        this._connectionsByPeerId = new HashMap();
 
         /**
          * HashMap from peerAddresses to connections.
@@ -111,38 +97,23 @@ class ConnectionPool extends Observable {
      * @returns {Array<PeerConnection>}
      */
     values() {
-        return Array.from(this._store.values());
+        return Array.from(this._connectionsByPeerAddress.values());
     }
 
-    /**
-     * @param {number} id
-     * @returns {PeerConnection|null}
-     */
-    get(id) {
-        return this._store.get(id);
-    }
 
     /**
      * @param {PeerAddress} peerAddress
      * @returns {PeerConnection|null}
      */
-    getByPeerAddress(peerAddress) {
+    getConnectionByPeerAddress(peerAddress) {
         return this._connectionsByPeerAddress.get(peerAddress);
-    }
-
-    /**
-     * @param {PeerId} peerId
-     * @returns {PeerConnection|null}
-    */
-    getByPeerId(peerId) {
-        return this._connectionsByPeerId.get(peerId);
     }
 
     /**
      * @param {NetAddress} netAddress
      * @returns {Array<PeerConnection>}
      */
-    getConnectionsByNetAddress(netAddress) {
+    getConnectionByNetAddress(netAddress) {
         if(this._connectionsByNetAddress.contains(netAddress)){
             return this._connectionsByNetAddress.get(netAddress);
         }
@@ -154,7 +125,7 @@ class ConnectionPool extends Observable {
      * @returns {boolean}
      */
     isEstablished(peerAddress) {
-        const peerAddressState = this.getByPeerAddress(peerAddress);
+        const peerAddressState = this.getConnectionByPeerAddress(peerAddress);
         return peerAddressState && peerAddressState.state === PeerConnectionState.ESTABLISHED;
     }
 
@@ -165,12 +136,11 @@ class ConnectionPool extends Observable {
      */
     _add(peerConnection) {
         if (peerConnection) {
-            this._store.set(peerConnection.id, peerConnection);
             if (peerConnection.peerAddress){
                 this._connectionsByPeerAddress.put(peerConnection.peerAddress, peerConnection);
 
-                if (peerConnection.peerAddress.protocol === Protocol.RTC) {
-                    this._connectionsByPeerId.put(peerConnection.peerAddress.peerId, peerConnection);
+                if (peerConnection.peerAddress.netAddress) {
+                    this._addNetAddress(peerConnection, peerConnection.peerAddress.netAddress);
                 }
             }
         }
@@ -187,19 +157,12 @@ class ConnectionPool extends Observable {
                 this._connectingCount--;
             }
             if (peerConnection.peerAddress) {
-                // Delete from peerId index.
-                if (peerConnection.peerAddress.protocol === Protocol.RTC) {
-                    this._connectionsByPeerId.remove(peerConnection.peerAddress.peerId);
-                }
-
                 if (peerConnection.peerAddress.netAddress) {
                     this._removeNetAddress(peerConnection, peerConnection.peerAddress.netAddress);
                 }
 
                 this._connectionsByPeerAddress.remove(peerConnection.peerAddress);
             }
-
-            this._store.delete(peerConnection.id);
         }
     }
 
@@ -261,7 +224,7 @@ class ConnectionPool extends Observable {
             throw `Connecting to banned address ${peerAddress}`;
         }
 
-        const peerConnection = this.getByPeerAddress(peerAddress);
+        const peerConnection = this.getConnectionByPeerAddress(peerAddress);
         if (peerConnection) {
             throw `Duplicate connection to ${peerAddress}`;
         }
@@ -274,7 +237,7 @@ class ConnectionPool extends Observable {
 
         // Forbid connection if we have too many connections to the peer's IP address.
         if (peerAddress.netAddress && !peerAddress.netAddress.isPseudo()) {
-            if (this.getConnectionsByNetAddress(peerAddress.netAddress).length > Network.PEER_COUNT_PER_IP_MAX) {
+            if (this.getConnectionByNetAddress(peerAddress.netAddress).length > Network.PEER_COUNT_PER_IP_MAX) {
                 Log.e(ConnectionPool, `connection limit per ip (${Network.PEER_COUNT_PER_IP_MAX}) reached`);
                 return false;
             }
@@ -305,7 +268,7 @@ class ConnectionPool extends Observable {
             }
 
             if (conn.inbound){
-                const peerConnection = this.getByPeerAddress(conn.peerAddress);
+                const peerConnection = this.getConnectionByPeerAddress(conn.peerAddress);
                 if (peerConnection) {
                     conn.close(ClosingType.DUPLICATE_CONNECTION,  `Duplicate connection to ${conn.peerAddress}`);
                 }    
@@ -314,7 +277,7 @@ class ConnectionPool extends Observable {
 
         // Close connection if we have too many connections to the peer's IP address.
         if (conn.netAddress && !conn.netAddress.isPseudo()) {
-            if (this.getConnectionsByNetAddress(conn.netAddress).length > Network.PEER_COUNT_PER_IP_MAX) {
+            if (this.getConnectionByNetAddress(conn.netAddress).length > Network.PEER_COUNT_PER_IP_MAX) {
                 conn.close(ClosingType.CONNECTION_LIMIT_PER_IP, `connection limit per ip (${Network.PEER_COUNT_PER_IP_MAX}) reached`);
                 return false;
             }
@@ -344,7 +307,7 @@ class ConnectionPool extends Observable {
 
         // Close connection if we have too many connections to the peer's IP address.
         if (peer.netAddress && !peer.netAddress.isPseudo()) {
-            if (this.getConnectionsByNetAddress(peer.netAddress).length > Network.PEER_COUNT_PER_IP_MAX) {
+            if (this.getConnectionByNetAddress(peer.netAddress).length > Network.PEER_COUNT_PER_IP_MAX) {
                 agent.channel.close(ClosingType.CONNECTION_LIMIT_PER_IP, `connection limit per ip (${Network.PEER_COUNT_PER_IP_MAX}) reached`);
                 return false;
             }
@@ -403,7 +366,7 @@ class ConnectionPool extends Observable {
         if(conn.outbound) {
             this._connectingCount--;
 
-            peerConnection = this.getByPeerAddress(conn.peerAddress);
+            peerConnection = this.getConnectionByPeerAddress(conn.peerAddress);
 
             if(!peerConnection) {
                 throw `Connecting to outbound peer address not stored ${conn.peerAddress}`;
@@ -474,7 +437,7 @@ class ConnectionPool extends Observable {
             return;
         }
 
-        let peerConnection = this.getByPeerAddress(peer.peerAddress);
+        let peerConnection = this.getConnectionByPeerAddress(peer.peerAddress);
         if (!peerConnection) {
             //inbound
             peerConnection = this._inboundStore.get(agent.channel.connection);
@@ -552,7 +515,7 @@ class ConnectionPool extends Observable {
                 this._close(null, channel.peerAddress, type);
             }
 
-            const peerConnection = this.getByPeerAddress(channel.peerAddress);
+            const peerConnection = this.getConnectionByPeerAddress(channel.peerAddress);
             this._remove(peerConnection);
         }
 
@@ -594,7 +557,7 @@ class ConnectionPool extends Observable {
      * @returns {void}
      */
     _close(channel, peerAddress, type = null) {
-        const peerConnection = this.getByPeerAddress(peerAddress);
+        const peerConnection = this.getConnectionByPeerAddress(peerAddress);
         if (peerConnection) {
             if (peerConnection.state === PeerConnectionState.CONNECTING) {
                 this._connectingCount--;
@@ -679,19 +642,19 @@ class ConnectionPool extends Observable {
 
     /** @type {number} */
     get count() {
-        return this._store.size;
+        return this._connectionsByPeerAddress.length;
     }
 
     /** @type {number} */
     get bytesSent() {
         return this._bytesSent
-            + this.values().reduce((n, peerConnection) => n + peerConnection.networkConnection ? peerConnection.networkConnection.bytesSent : 0, 0);
+            + this.values().reduce((n, peerConnection) => n + (peerConnection.networkConnection ? peerConnection.networkConnection.bytesSent : 0), 0);
     }
 
     /** @type {number} */
     get bytesReceived() {
         return this._bytesReceived
-            + this.values().reduce((n, peerConnection) => n + peerConnection.networkConnection ? peerConnection.networkConnection.bytesReceived : 0, 0);
+            + this.values().reduce((n, peerConnection) => n + (peerConnection.networkConnection ? peerConnection.networkConnection.bytesReceived : 0), 0);
     }
 
 }
