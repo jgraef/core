@@ -68,7 +68,7 @@ class Network extends Observable {
          * @type {ConnectionPool}
          * @private
          */
-        this._connections = new ConnectionPool(this._addresses, networkConfig, blockchain, time);
+        this._connections = new ConnectionPool(this._addresses, networkConfig, blockchain);
         this._connections.on('peer-joined', peer => this._onPeerJoined(peer));
         this._connections.on('peer-left', peer => this._onPeerLeft(peer));
         this._connections.on('peers-changed', () => this._onPeersChanged());
@@ -410,7 +410,7 @@ Network.OUTBOUND_PEER_COUNT_PER_SUBNET_MAX = 2;
  * @type {number}
  * @constant
  */
-Network.PEER_COUNT_PER_IP_MAX = PlatformUtils.isBrowser() ? 1 : 20;
+Network.PEER_COUNT_PER_IP_MAX = PlatformUtils.isBrowser() ? 1 : 10;
 /**
  * @type {number}
  * @constant
@@ -465,7 +465,7 @@ Network.CONNECT_BACKOFF_MAX = 10 * 60 * 1000; // 10 minutes
  * @type {number}
  * @constant
  */
-Network.TIME_OFFSET_MAX = 15 * 60 * 1000; // 15 minutes
+Network.TIME_OFFSET_MAX = 10 * 60 * 1000; // 10 minutes
 /**
  * @type {number}
  * @constant

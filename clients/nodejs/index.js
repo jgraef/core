@@ -79,7 +79,7 @@ if (isNano && config.miner.enabled) {
     process.exit(1);
 }
 if (config.metricsServer.enabled && config.protocol !== 'wss') {
-    console.error('Cannot provide metrics when running as without a certificate');
+    console.error('Cannot provide metrics when running without a certificate');
     process.exit(1);
 }
 if (config.metricsServer.enabled && isNano) {
@@ -221,7 +221,7 @@ const $ = {};
 
     const account = !isNano ? await $.accounts.get($.wallet.address) : null;
     Nimiq.Log.i(TAG, `Wallet initialized for address ${$.wallet.address.toUserFriendlyAddress()}.`
-        + (!isNano ? ` Balance: ${Nimiq.Policy.satoshisToCoins(account.balance)} NIM` : ''));
+        + (!isNano ? ` Balance: ${Nimiq.Policy.lunasToCoins(account.balance)} NIM` : ''));
 
     Nimiq.Log.i(TAG, `Blockchain state: height=${$.blockchain.height}, headHash=${$.blockchain.headHash}`);
 
@@ -266,8 +266,17 @@ const $ = {};
         Nimiq.Log.i(TAG, `Disconnected from ${peer.peerAddress.toString()}`);
     });
 
+    const isSeed = (peerAddress) => Nimiq.GenesisConfig.SEED_PEERS.some(seed => seed.equals(peerAddress));
+    $.network.on('peer-joined', (peer) => {
+        if (Math.abs(peer.timeOffset) > Nimiq.Network.TIME_OFFSET_MAX && isSeed(peer.peerAddress)) {
+            Nimiq.Log.e(TAG, 'Your local system time seems to be wrong! You might not be able to synchronize with the network.');
+        }
+    });
+
     if (!config.passive) {
         $.network.connect();
+    } else {
+        $.network.allowInboundConnections = true;
     }
 
     if (config.miner.enabled && config.passive) {
@@ -276,7 +285,9 @@ const $ = {};
     $.consensus.on('established', () => {
         if (config.miner.enabled) $.miner.startWork();
     });
-    $.consensus.on('lost', () => $.miner.stopWork());
+    $.consensus.on('lost', () => {
+        if (!config.poolMining.enabled || config.poolMining.mode !== 'nano') $.miner.stopWork()
+    });
 
     if (typeof config.miner.threads === 'number') {
         $.miner.threads = config.miner.threads;
@@ -305,8 +316,8 @@ const $ = {};
                 const account = !isNano ? await $.accounts.get($.wallet.address) : null;
                 const sum = hashrates.reduce((acc, val) => acc + val, 0);
                 Nimiq.Log.i(TAG, `Hashrate: ${(sum / hashrates.length).toFixed(2).padStart(7)} H/s`
-                    + (!isNano ? ` - Balance: ${Nimiq.Policy.satoshisToCoins(account.balance)} NIM` : '')
-                    + (config.poolMining.enabled ? ` - Pool balance: ${Nimiq.Policy.satoshisToCoins($.miner.balance)} NIM (confirmed ${Nimiq.Policy.satoshisToCoins($.miner.confirmedBalance)} NIM)` : '')
+                    + (!isNano ? ` - Balance: ${Nimiq.Policy.lunasToCoins(account.balance)} NIM` : '')
+                    + (config.poolMining.enabled ? ` - Pool balance: ${Nimiq.Policy.lunasToCoins($.miner.balance)} NIM (confirmed ${Nimiq.Policy.lunasToCoins($.miner.confirmedBalance)} NIM)` : '')
                     + ` - Mempool: ${$.mempool.getTransactions().length} tx`);
                 hashrates.length = 0;
             }
@@ -345,7 +356,7 @@ const $ = {};
     }
 
     if (config.metricsServer.enabled) {
-        $.metricsServer = new MetricsServer(networkConfig.sslConfig, config.metricsServer.port, config.metricsServer.password);
+        $.metricsServer = new MetricsServer(networkConfig.ssl, config.metricsServer.port, config.metricsServer.password);
         $.metricsServer.init($.blockchain, $.accounts, $.mempool, $.network, $.miner);
     }
 

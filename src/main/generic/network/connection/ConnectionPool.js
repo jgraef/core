@@ -4,13 +4,12 @@ class ConnectionPool extends Observable {
      * @param {PeerAddressBook} peerAddresses
      * @param {NetworkConfig} networkConfig
      * @param {IBlockchain} blockchain
-     * @param {Time} time
-     * @listens WssConnector#connection
-     * @listens WssConnector#error
+     * @listens WebSocketConnector#connection
+     * @listens WebSocketConnector#error
      * @listens WebRtcConnector#connection
      * @listens WebRtcConnector#error
      */
-    constructor(peerAddresses, networkConfig, blockchain, time) {
+    constructor(peerAddresses, networkConfig, blockchain) {
         super();
 
         /**
@@ -30,12 +29,6 @@ class ConnectionPool extends Observable {
          * @private
          */
         this._blockchain = blockchain;
-
-        /**
-         * @type {Time}
-         * @private
-         */
-        this._time = time;
 
         /**
          * HashMap from peerAddresses to connections.
@@ -381,13 +374,13 @@ class ConnectionPool extends Observable {
             }
 
             // Close connection if we have too many connections to the peer's IP address.
-            if (this.getConnectionsByNetAddress(conn.netAddress).length >= Network.PEER_COUNT_PER_IP_MAX) {
+            if (!conn.netAddress.isPrivate() && this.getConnectionsByNetAddress(conn.netAddress).length >= Network.PEER_COUNT_PER_IP_MAX) {
                 conn.close(CloseType.CONNECTION_LIMIT_PER_IP, `connection limit per IP (${Network.PEER_COUNT_PER_IP_MAX}) reached`);
                 return false;
             }
 
             // Close connection if we have too many connections to the peer's subnet.
-            if (this.getConnectionsBySubnet(conn.netAddress).length >= Network.INBOUND_PEER_COUNT_PER_SUBNET_MAX) {
+            if (!conn.netAddress.isPrivate() && this.getConnectionsBySubnet(conn.netAddress).length >= Network.INBOUND_PEER_COUNT_PER_SUBNET_MAX) {
                 conn.close(CloseType.CONNECTION_LIMIT_PER_IP, `connection limit per subnet (${Network.INBOUND_PEER_COUNT_PER_SUBNET_MAX}) reached`);
                 return false;
             }
@@ -612,7 +605,7 @@ class ConnectionPool extends Observable {
         // Let listeners know that the peers changed.
         this.fire('peers-changed');
 
-        Log.d(ConnectionPool, () => `[PEER-JOINED] ${peer.peerAddress} ${peer.netAddress} (version=${peer.version}, services=${peer.peerAddress.services}, headHash=${peer.headHash.toBase64()})`);
+        Log.d(ConnectionPool, () => `[PEER-JOINED] ${peer.peerAddress} ${peer.netAddress} (version=${peer.version}, services=${peer.peerAddress.services}, userAgent=${peer.userAgent || '<unknown>'}, headHash=${peer.headHash.toBase64()})`);
     }
 
     /**
@@ -659,7 +652,7 @@ class ConnectionPool extends Observable {
             const kbTransferred = ((peerConnection.networkConnection.bytesSent
                 + peerConnection.networkConnection.bytesReceived) / 1000).toFixed(2);
             Log.d(ConnectionPool, () => `[PEER-LEFT] ${peerConnection.peerAddress} ${peerConnection.peer.netAddress} `
-                + `(version=${peerConnection.peer.version}, transferred=${kbTransferred} kB, closeType=${type} ${reason})`);
+                + `(transferred=${kbTransferred} kB, closeType=${type} ${reason})`);
         } else {
             if (peerConnection.networkConnection.inbound) {
                 this._inboundCount--;

@@ -99,10 +99,11 @@ class PeerChannel extends Observable {
      * @param {PeerAddress} peerAddress
      * @param {Hash} headHash
      * @param {Uint8Array} challengeNonce
+     * @param {string} [appAgent]
      * @return {boolean}
      */
-    version(peerAddress, headHash, challengeNonce) {
-        return this._send(new VersionMessage(Version.CODE, peerAddress, GenesisConfig.GENESIS_HASH, headHash, challengeNonce));
+    version(peerAddress, headHash, challengeNonce, appAgent) {
+        return this._send(new VersionMessage(Version.CODE, peerAddress, GenesisConfig.GENESIS_HASH, headHash, challengeNonce, Version.createUserAgent(appAgent)));
     }
 
     /**
@@ -254,7 +255,7 @@ class PeerChannel extends Observable {
      * @param {PeerId} recipientId
      * @param {number} nonce
      * @param {number} ttl
-     * @param {SignalMessage.Flags|number} flags
+     * @param {SignalMessage.Flag|number} flags
      * @param {Uint8Array} [payload]
      * @param {PublicKey} [senderPubKey]
      * @param {Signature} [signature]

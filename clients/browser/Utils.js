@@ -49,8 +49,14 @@ class Utils {
         return (Number.isInteger(bytes) ? bytes : bytes.toFixed(2)) + ' ' + units[i];
     }
 
+    static lunasToCoins(value) {
+        return Nimiq.Policy.lunasToCoins(value).toFixed(Math.log10(Nimiq.Policy.LUNAS_PER_COIN));
+    }
+
     static satoshisToCoins(value) {
-        return Nimiq.Policy.satoshisToCoins(value).toFixed(Math.log10(Nimiq.Policy.SATOSHIS_PER_COIN));
+        Nimiq.Log.w(Utils, 'Utils.satoshisToCoins is deprecated and will be removed '
+                         + 'in an upcoming release. Use Utils.lunasToCoins instead.');
+        return Utils.lunasToCoins(value);
     }
 
     static hash(data, algorithm) {

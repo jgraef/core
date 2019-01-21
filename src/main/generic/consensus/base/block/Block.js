@@ -211,7 +211,8 @@ class Block {
             for (; depth < this._interlink.length; depth++) {
                 if (prevHash.equals(this._interlink.hashes[depth])) {
                     blockFound = true;
-                    if (!BlockUtils.isProofOfWork(prevPow, Math.pow(2, targetHeight - depth))) {
+                    const target = new BigNumber(2).pow(targetHeight - depth);
+                    if (!BlockUtils.isProofOfWork(prevPow, target)) {
                         Log.v(Block, 'No interlink successor - invalid position in interlink');
                         return false;
                     }
@@ -242,7 +243,7 @@ class Block {
         }
         // Otherwise, if the prevHash doesn't match but the blocks should be adjacent according to their height fields,
         // this cannot be a valid successor of predecessor.
-        else if (this._header.height === predecessor.height.height + 1) {
+        else if (this._header.height === predecessor.header.height + 1) {
             Log.v(Block, 'No interlink successor - immediate height (2)');
             return false;
         }

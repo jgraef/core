@@ -25,6 +25,8 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
         this._superUpdateToSize = super._updateToSize;
 
         if (PlatformUtils.isNodeJs()) {
+            Log.i(MinerWorkerPool, `Using add-on optimized for instruction set: ${cpuSupport}`);
+
             /**
              * @param {SerialBuffer} blockHeader
              * @param {number} compact
@@ -100,7 +102,7 @@ class MinerWorkerPool extends IWorker.Pool(MinerWorker) {
      * @param {Function} callback
      * @return {number}
      */
-    on(type, callback) { this._observable.on(type, callback); }
+    on(type, callback) { return this._observable.on(type, callback); }
 
     /**
      * @param {string} type

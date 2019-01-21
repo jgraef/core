@@ -195,10 +195,10 @@ function bytesFormat(bytes) {
 }
 
 function nimValueFormat(value, fixedLength = 0, withSign = false) {
-    let valueFirst = (Math.round(value / 1000) / 100).toFixed(2);
+    let valueFirst = ((value > 0 ? Math.floor : Math.ceil)(value / 1000) / 100).toFixed(2);
     if (withSign && value > 0) valueFirst = `+${valueFirst}`;
     valueFirst = new Array(Math.max(0, fixedLength - valueFirst.length)).join(' ') + valueFirst;
-    const valueSecond = ((value % 1000) / 1000).toFixed(3).substring(2);
+    const valueSecond = ((Math.abs(value) % 1000) / 1000).toFixed(3).substring(2);
     return chalk`{bold ${valueFirst}}${valueSecond} NIM`;
 }
 
@@ -680,20 +680,12 @@ async function action(args, rl) {
             return;
         }
         case 'mempool.content': {
-            let includeTransactions = args.length === 2 && isTrue(args[1]);
+            const includeTransactions = args.length === 2 && isTrue(args[1]);
             const transactions = await jsonRpcFetch('mempoolContent', includeTransactions);
             console.log(chalk`Mempool content ({bold ${transactions.length}} transactions):`);
             for (const tx of transactions) {
                 if (includeTransactions) {
-                    const date = new Date(tx.timestamp * 1000);
-                    let dateStr = date.getDate().toString();
-                    if (dateStr.length === 1) {
-                        dateStr = ` ${dateStr} `;
-                    } else {
-                        dateStr = `${dateStr[0]}${dateStr[1]} `;
-                    }
-                    console.log(chalk`${dateStr} | ${tx.fromString} -> ${tx.toString} | ${nimValueFormat(tx.value, 10)} | ${nimValueFormat(tx.fee, 10)}`);
-                    console.log(`ID: ${tx.hash}`);
+                    console.log(chalk`ID: ${tx.hash} | ${tx.fromAddress} -> ${tx.toAddress} | ${nimValueFormat(tx.value, 10)} | ${nimValueFormat(tx.fee, 10)}`);
                 } else {
                     console.log(tx);
                 }
@@ -701,7 +693,7 @@ async function action(args, rl) {
             return;
         }
         case 'mempool.content.json': {
-            let includeTransactions = args.length === 2 && isTrue(args[1]);
+            const includeTransactions = args.length === 2 && isTrue(args[1]);
             console.log(JSON.stringify(await jsonRpcFetch('mempoolContent', includeTransactions)));
             return;
         }
